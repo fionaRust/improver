@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- coding: iso-8859-1 -*-
 # -----------------------------------------------------------------------------
 # (C) British Crown Copyright 2017 Met Office.
 # All rights reserved.
@@ -32,6 +32,8 @@
 """Script to run wind downscaling."""
 
 import argparse
+
+from dask.distributed import Client
 
 import iris
 from iris.exceptions import CoordinateNotFoundError
@@ -99,16 +101,28 @@ def main():
         wind_speed_iterator = wind_speed.slices_over('realization')
     except CoordinateNotFoundError:
         wind_speed_iterator = [wind_speed]
-    wind_speed_list = iris.cube.CubeList()
-    for wind_speed_slice in wind_speed_iterator:
-        result = (
-            wind_downscaling.RoughnessCorrection(
-                silhouette_roughness_filepath, sigma, target_orog,
-                standard_orog, float(args.model_resolution),
-                z0_cube=veg_roughness_cube,
-                height_levels_cube=height_levels).process(wind_speed_slice))
-        wind_speed_list.append(result)
-    wind_speed = wind_speed_list.merge_cube()
+    #wind_speed_list = iris.cube.CubeList()
+
+    client = Client()
+    print client
+    
+        #result = (
+            #wind_downscaling.RoughnessCorrection(
+                #silhouette_roughness_filepath, sigma, target_orog,
+                #standard_orog, float(args.model_resolution),
+                #z0_cube=veg_roughness_cube,
+                #height_levels_cube=height_levels).process(wind_speed_slice))
+        #wind_speed_list.append(result)
+    RoughnessCorrection = wind_downscaling.RoughnessCorrection(
+                            silhouette_roughness_filepath, sigma, target_orog,
+                            standard_orog, float(args.model_resolution),
+                            z0_cube=veg_roughness_cube,
+                            height_levels_cube=height_levels)
+    wind_speed_list = [client.submit(RoughnessCorrection.process,wind_speed_slice)
+                            for wind_speed_slice in wind_speed_iterator]
+    wind_speed_list = [client.gather(wind_speed) for wind_speed in wind_speed_list]
+    
+    wind_speed = iris.cube.CubeList(wind_speed_list).merge_cube()
     non_dim_coords =  [x.name() for x in wind_speed.coords(dim_coords=False)]
     if 'realization' in non_dim_coords:
         wind_speed = iris.util.new_axis(wind_speed, 'realization')
