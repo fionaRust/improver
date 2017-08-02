@@ -33,16 +33,25 @@
 
 import argparse
 
+import dask
+
 from dask.distributed import Client
 
 from dask import delayed
 from dask.distributed import as_completed
+import dask.bag as db
 
 
 import iris
 from iris.exceptions import CoordinateNotFoundError
 
 from improver import wind_downscaling
+
+def my_wrapper(cube, WindDownscalingInstance):
+    """A little helper function, not sure why it's needed but couldn't get it
+       to work without it."""
+    my_instance = WindDownscalingInstance
+    return my_instance.process(cube)
 
 
 def main():
@@ -108,33 +117,23 @@ def main():
 
     wind_speed_list = iris.cube.CubeList()
 
-    client = Client()
-    print client
-    
-        #result = (
-            #wind_downscaling.RoughnessCorrection(
-                #silhouette_roughness_filepath, sigma, target_orog,
-                #standard_orog, float(args.model_resolution),
-                #z0_cube=veg_roughness_cube,
-                #height_levels_cube=height_levels).process(wind_speed_slice))
-        #wind_speed_list.append(result)
+    # Set up an instance of the plugin to use
     RoughnessCorrection = wind_downscaling.RoughnessCorrection(
                             silhouette_roughness_filepath, sigma, target_orog,
                             standard_orog, float(args.model_resolution),
                             z0_cube=veg_roughness_cube,
                             height_levels_cube=height_levels)
 
-    #wind_speed_list = [client.submit(RoughnessCorrection.process,wind_speed_slice)
-                            #for wind_speed_slice in wind_speed_iterator]
-    #wind_speed_list = client.gather(wind_speed_list)
-    wind_speed_futures = client.map(RoughnessCorrection.process, wind_speed_iterator)
-    #print wind_speed_futures
-    for future in as_completed(wind_speed_futures):
-        #print future
-        #print future.result()
-        wind_speed_list.append(future.result())
-    print wind_speed_list
-    wind_speed = wind_speed_list.merge_cube()
+
+    # I could only make this work with a wrapper function.
+    wind_speed_bags = db.from_sequence(wind_speed_iterator).map(my_wrapper, RoughnessCorrection)
+    
+    # Can change whether to use threading or not.
+    with dask.set_options(get=dask.threaded.get):
+        wind_speed_list = wind_speed_bags.compute()
+
+    # Merging the results back together.
+    wind_speed = iris.cube.CubeList(wind_speed_list).merge_cube()
     non_dim_coords =  [x.name() for x in wind_speed.coords(dim_coords=False)]
     if 'realization' in non_dim_coords:
         wind_speed = iris.util.new_axis(wind_speed, 'realization')
