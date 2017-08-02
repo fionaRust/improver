@@ -35,6 +35,10 @@ import argparse
 
 from dask.distributed import Client
 
+from dask import delayed
+from dask.distributed import as_completed
+
+
 import iris
 from iris.exceptions import CoordinateNotFoundError
 
@@ -101,7 +105,8 @@ def main():
         wind_speed_iterator = wind_speed.slices_over('realization')
     except CoordinateNotFoundError:
         wind_speed_iterator = [wind_speed]
-    #wind_speed_list = iris.cube.CubeList()
+
+    wind_speed_list = iris.cube.CubeList()
 
     client = Client()
     print client
@@ -118,11 +123,18 @@ def main():
                             standard_orog, float(args.model_resolution),
                             z0_cube=veg_roughness_cube,
                             height_levels_cube=height_levels)
-    wind_speed_list = [client.submit(RoughnessCorrection.process,wind_speed_slice)
-                            for wind_speed_slice in wind_speed_iterator]
-    wind_speed_list = [client.gather(wind_speed) for wind_speed in wind_speed_list]
-    
-    wind_speed = iris.cube.CubeList(wind_speed_list).merge_cube()
+
+    #wind_speed_list = [client.submit(RoughnessCorrection.process,wind_speed_slice)
+                            #for wind_speed_slice in wind_speed_iterator]
+    #wind_speed_list = client.gather(wind_speed_list)
+    wind_speed_futures = client.map(RoughnessCorrection.process, wind_speed_iterator)
+    #print wind_speed_futures
+    for future in as_completed(wind_speed_futures):
+        #print future
+        #print future.result()
+        wind_speed_list.append(future.result())
+    print wind_speed_list
+    wind_speed = wind_speed_list.merge_cube()
     non_dim_coords =  [x.name() for x in wind_speed.coords(dim_coords=False)]
     if 'realization' in non_dim_coords:
         wind_speed = iris.util.new_axis(wind_speed, 'realization')
