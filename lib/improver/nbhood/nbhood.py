@@ -38,9 +38,11 @@ from iris.exceptions import CoordinateNotFoundError
 import numpy as np
 import scipy.ndimage.filters
 
-from improver.nbhood.circular_kernel import CircularNeighbourhood
+from improver.nbhood.circular_kernel import (
+    CircularNeighbourhood, GeneratePercentilesFromACircularNeighbourhood)
 from improver.nbhood.square_kernel import SquareNeighbourhood
 
+from improver.constants import DEFAULT_PERCENTILES
 from improver.utilities.cube_checker import (
     check_cube_coordinates, find_dimension_coordinate_mismatch)
 from improver.utilities.cube_manipulation import concatenate_cubes
@@ -149,7 +151,7 @@ class Utilities(object):
         return new_width
 
 
-class NeighbourhoodProcessing(object):
+class BaseNeighbourhoodProcessing(object):
     """
     Apply a neighbourhood processing method to a thresholded cube.
 
@@ -163,31 +165,26 @@ class NeighbourhoodProcessing(object):
     """
 
     def __init__(self, neighbourhood_method, radii, lead_times=None,
-                 weighted_mode=True, ens_factor=1.0):
+                 ens_factor=1.0):
         """
         Create a neighbourhood processing plugin that applies a smoothing
         to points in a cube.
 
         Parameters
         ----------
-
-        neighbourhood_method : str
-            Name of the neighbourhood method to use. Options: 'circular',
-            'square'.
+        neighbourhood_method : Class object
+            Instance of the class containing the method that will be used for
+            the neighbourhood processing.
         radii : float or List (if defining lead times)
             The radii in metres of the neighbourhood to apply.
             Rounded up to convert into integer number of grid
             points east and north, based on the characteristic spacing
             at the zero indices of the cube projection-x and y coords.
-        lead_times : None or List
+        lead_times : None or List (optional)
             List of lead times or forecast periods, at which the radii
             within 'radii' are defined. The lead times are expected
             in hours.
-        weighted_mode : boolean
-            If True, use a circle for neighbourhood kernel with
-            weighting decreasing with radius.
-            If False, use a circle with constant weighting.
-        ens_factor : float
+        ens_factor : float (optional)
             The factor with which to adjust the neighbourhood size
             for more than one ensemble member.
             If ens_factor = 1.0 this essentially conserves ensemble
@@ -195,18 +192,7 @@ class NeighbourhoodProcessing(object):
             equivalent of an ensemble member.
             Optional, defaults to 1.0
         """
-        self.neighbourhood_method_key = neighbourhood_method
-        methods = {
-            "circular": CircularNeighbourhood,
-            "square": SquareNeighbourhood}
-        try:
-            method = methods[neighbourhood_method]
-            self.neighbourhood_method = method(weighted_mode)
-        except KeyError:
-            msg = ("The neighbourhood_method requested: {} is not a "
-                   "supported method. Please choose from: {}".format(
-                       neighbourhood_method, methods.keys()))
-            raise KeyError(msg)
+        self.neighbourhood_method = neighbourhood_method
 
         if isinstance(radii, list):
             self.radii = [float(x) for x in radii]
@@ -219,7 +205,6 @@ class NeighbourhoodProcessing(object):
                        "and the number of lead times. "
                        "Unable to continue due to mismatch.")
                 raise ValueError(msg)
-        self.weighted_mode = bool(weighted_mode)
         self.ens_factor = float(ens_factor)
 
     def _find_radii(self, num_ens, cube_lead_times=None):
@@ -257,12 +242,16 @@ class NeighbourhoodProcessing(object):
 
     def __repr__(self):
         """Represent the configured plugin instance as a string."""
+        if callable(self.neighbourhood_method):
+            neighbourhood_method = self.neighbourhood_method()
+        else:
+            neighbourhood_method = self.neighbourhood_method
+
         result = ('<NeighbourhoodProcessing: neighbourhood_method: {}; '
-                  'radii: {}; lead_times: {}; '
-                  'weighted_mode: {}; ens_factor: {}>')
+                  'radii: {}; lead_times: {}; ens_factor: {}>')
         return result.format(
-            self.neighbourhood_method_key, self.radii, self.lead_times,
-            self.weighted_mode, self.ens_factor)
+            neighbourhood_method, self.radii, self.lead_times,
+            self.ens_factor)
 
     def process(self, cube):
         """
@@ -342,3 +331,110 @@ class NeighbourhoodProcessing(object):
         merged_cube = check_cube_coordinates(
             cube, merged_cube, exception_coordinates=exception_coordinates)
         return merged_cube
+
+
+class GeneratePercentilesFromANeighbourhood(BaseNeighbourhoodProcessing):
+
+    """Class for generating percentiles from a neighbourhood."""
+
+    def __init__(
+            self, neighbourhood_method, radii, lead_times=None,
+            ens_factor=1.0, percentiles=DEFAULT_PERCENTILES):
+        """
+        Create a neighbourhood processing subclass that generates percentiles
+        from a neighbourhood of points.
+
+        Parameters
+        ----------
+        neighbourhood_method : str
+            Name of the neighbourhood method to use. Options: 'circular'.
+        radii : float or List (if defining lead times)
+            The radii in metres of the neighbourhood to apply.
+            Rounded up to convert into integer number of grid
+            points east and north, based on the characteristic spacing
+            at the zero indices of the cube projection-x and y coords.
+        lead_times : None or List (optional)
+            List of lead times or forecast periods, at which the radii
+            within 'radii' are defined. The lead times are expected
+            in hours.
+        ens_factor : float (optional)
+            The factor with which to adjust the neighbourhood size
+            for more than one ensemble member.
+            If ens_factor = 1.0 this essentially conserves ensemble
+            members if every grid square is considered to be the
+            equivalent of an ensemble member.
+            Optional, defaults to 1.0
+        percentiles : list (optional)
+            Percentile values at which to calculate; if not provided uses
+            DEFAULT_PERCENTILES.
+        """
+        super(GeneratePercentilesFromANeighbourhood, self).__init__(
+            neighbourhood_method, radii, lead_times=lead_times,
+            ens_factor=ens_factor)
+
+        methods = {
+            "circular": GeneratePercentilesFromACircularNeighbourhood}
+        try:
+            method = methods[neighbourhood_method]
+            self.neighbourhood_method = method(percentiles=percentiles)
+        except KeyError:
+            msg = ("The neighbourhood_method requested: {} is not a "
+                   "supported method. Please choose from: {}".format(
+                       neighbourhood_method, methods.keys()))
+            raise KeyError(msg)
+
+
+class NeighbourhoodProcessing(BaseNeighbourhoodProcessing):
+
+    """Class for applying neighbourhood processing to produce a smoothed field
+    within the chosen neighbourhood."""
+
+    def __init__(
+            self, neighbourhood_method, radii, lead_times=None,
+            ens_factor=1.0, weighted_mode=True):
+        """
+        Create a neighbourhood processing subclass that applies a smoothing
+        to points in a cube.
+
+        Parameters
+        ----------
+        neighbourhood_method : str
+            Name of the neighbourhood method to use. Options: 'circular',
+            'square'.
+        radii : float or List (if defining lead times)
+            The radii in metres of the neighbourhood to apply.
+            Rounded up to convert into integer number of grid
+            points east and north, based on the characteristic spacing
+            at the zero indices of the cube projection-x and y coords.
+        lead_times : None or List (optional)
+            List of lead times or forecast periods, at which the radii
+            within 'radii' are defined. The lead times are expected
+            in hours.
+        ens_factor : float (optional)
+            The factor with which to adjust the neighbourhood size
+            for more than one ensemble member.
+            If ens_factor = 1.0 this essentially conserves ensemble
+            members if every grid square is considered to be the
+            equivalent of an ensemble member.
+            Optional, defaults to 1.0
+        weighted_mode : boolean (optional)
+            If True, use a circle for neighbourhood kernel with
+            weighting decreasing with radius.
+            If False, use a circle with constant weighting.
+
+        """
+        super(NeighbourhoodProcessing, self).__init__(
+            neighbourhood_method, radii, lead_times=lead_times,
+            ens_factor=ens_factor)
+
+        methods = {
+            "circular": CircularNeighbourhood,
+            "square": SquareNeighbourhood}
+        try:
+            method = methods[neighbourhood_method]
+            self.neighbourhood_method = method(weighted_mode)
+        except KeyError:
+            msg = ("The neighbourhood_method requested: {} is not a "
+                   "supported method. Please choose from: {}".format(
+                       neighbourhood_method, methods.keys()))
+            raise KeyError(msg)
