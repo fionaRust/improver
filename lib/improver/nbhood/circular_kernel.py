@@ -229,11 +229,16 @@ class GeneratePercentilesFromACircularNeighbourhood(object):
         ranges_xy = np.empty(2, dtype=int)
         ranges_xy[0] = int(np.floor(kernel.shape[0] / 2.0))
         ranges_xy[1] = int(np.floor(kernel.shape[1] / 2.0))
+        print "ranges_xy", ranges_xy
         padded = np.pad(slice_2d.data, ranges_xy, mode='mean',
                         stat_length=np.max(ranges_xy))
+        print "padded data\n ",padded
         padshape = np.shape(padded)  # Store size to make unflatten easier
         padded = padded.flatten()
-        # Add 2nd dimension with each point's neighbourhood points along it
+        # Add 2nd dimension with each point's neighbourhood points along it.
+        # nbhood_slices is a list of numpy arrays where each array contains the
+        # total number of points within the padded array. The number of arrays
+        # is equal to the number of points within the kernel.
         nbhood_slices = [
             np.roll(padded, (padshape[1]*j)+i)
             for i in range(-ranges_xy[1], ranges_xy[1]+1)
@@ -241,15 +246,19 @@ class GeneratePercentilesFromACircularNeighbourhood(object):
             if kernel[..., i+ranges_xy[1], j+ranges_xy[0]] > 0.]
 
         # Collapse this dimension into percentiles (a new 2nd dimension)
+        print "nbhood_slices = ", nbhood_slices
         perc_data = np.percentile(nbhood_slices, self.percentiles, axis=0)
+        print "perc_data = ", perc_data
         # Return to 3D
         perc_data = perc_data.reshape(
             len(self.percentiles), padshape[0], padshape[1])
+        print "perc_data reshaped = ", perc_data
         # Create a cube for these data:
         pctcube = self.make_percentile_cube(slice_2d)
         # And put in data, removing the padding
         pctcube.data = perc_data[:, ranges_xy[0]:-ranges_xy[0],
                                  ranges_xy[1]:-ranges_xy[1]]
+        #print "ptccube.data = ", pctcube.data
         return pctcube
 
     def run(self, cube, radius):
@@ -279,7 +288,7 @@ class GeneratePercentilesFromACircularNeighbourhood(object):
             cube, radius, MAX_RADIUS_IN_GRID_CELLS)
         ranges_xy = np.array(ranges_tuple)
         kernel = circular_kernel(ranges_xy, ranges_tuple, weighted_mode=False)
-
+        print "kernel: ", kernel
         # Loop over each 2D slice to reduce memory demand and derive
         # percentiles on the kernel. Will return an extra dimension.
         pctcubelist = iris.cube.CubeList()
