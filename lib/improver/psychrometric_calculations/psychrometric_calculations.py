@@ -1101,3 +1101,69 @@ class FallingSnowLevel(object):
 
         falling_snow_level = snow.merge_cube()
         return falling_snow_level
+
+
+class TemperatureToPotentialTemperature(object):
+    r"""
+        A class used to calculated the potential temperature from the input
+        temperature and pressure.
+
+        Equation for potential temperature, :math:`\theta`, is:
+            .. math::
+                {\theta} = T \left(\frac{P_0}{P}\right)^{(R/c_p)}
+        where :math:`T` is the temperature :math:`P_0` is a reference pressure
+        normally 1000hPa, :math:`P` is the pressure, :math:`R` is the specific
+        gas constant for dry air, :math:`c_p` is the Specific heat capacity
+        of dry air
+    """
+
+    def __init__(self, reference_pressure=1000.0,
+                 reference_pressure_units="hPa"):
+
+        """
+        Initialise class.
+
+        Keyword Args:
+            reference_pressure (float):
+                The reference pressure used in the calculation of potential
+                temperature, defaults to 1000.0
+            reference_pressure_units (string):
+                The units for the reference pressure, defaults to "hPa".
+        """
+        self.reference_pressure = reference_pressure
+        self.reference_pressure_units = Unit(reference_pressure_units)
+
+    def __repr__(self):
+        """Represent the configured plugin instance as a string."""
+        result = ('<TemperatureToPotentialTemperature: '
+                  'reference_pressure: {}, '
+                  'reference_pressure_units: {}>'.format(
+                      self.reference_pressure, self.reference_pressure_units))
+        return result
+
+    def process(self, temperature, pressure):
+        """
+        Calculate the potential temperature from the input temperature and
+        pressure cubes.
+
+        Args:
+            temperature (iris.cube.Cube):
+                A cube containing temperature data
+            pressure (iris.cube.Cube):
+                A cube containing pressure data
+        Returns:
+            theta (iris.cube.Cube):
+                A cube containing the resulting potential temperature data.
+        """
+        # We know these two are in the same units
+        power = cc.R_DRY_AIR/cc.CP_DRY_AIR
+        # Ensure our pressure data is in the same units, so the resulting
+        # calculation gives a cube with a fractional unit
+        reference_pressure = self.reference_pressure_units.convert(
+            self.reference_pressure, pressure.units)
+        pressure.data = (reference_pressure / pressure.data)**power
+        pressure.units = Unit("1")
+        # Find the potential temperature.
+        theta = temperature * pressure
+        theta.rename("air_potential_temperature")
+        return theta
