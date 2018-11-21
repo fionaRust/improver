@@ -1164,6 +1164,79 @@ class TemperatureToPotentialTemperature(object):
         pressure.data = (reference_pressure / pressure.data)**power
         pressure.units = Unit("1")
         # Find the potential temperature.
+        original_units = temperature.units
+        temperature.convert_units("K")
         theta = temperature * pressure
+        theta.convert_units(original_units)
         theta.rename("air_potential_temperature")
         return theta
+
+
+class PotentialTemperatureToTemperature(object):
+    r"""
+        A class used to calculated the temperature from the input
+        potential temperature and pressure.
+
+        Equation for temperature, :math:`T`, is:
+            .. math::
+                T = {\theta} \left(\frac{P}{P_0}\right)^{(R/c_p)}
+        where :math:`\theta` is the potential temperature,
+        :math:`P_0` is a reference pressure normally 1000hPa,
+        :math:`P` is the pressure, :math:`R` is the specific
+        gas constant for dry air, :math:`c_p` is the Specific heat capacity
+        of dry air
+    """
+
+    def __init__(self, reference_pressure=1000.0,
+                 reference_pressure_units="hPa"):
+
+        """
+        Initialise class.
+
+        Keyword Args:
+            reference_pressure (float):
+                The reference pressure used in the calculation of potential
+                temperature, defaults to 1000.0
+            reference_pressure_units (string):
+                The units for the reference pressure, defaults to "hPa".
+        """
+        self.reference_pressure = reference_pressure
+        self.reference_pressure_units = Unit(reference_pressure_units)
+
+    def __repr__(self):
+        """Represent the configured plugin instance as a string."""
+        result = ('<PotentialTemperatureToTemperature: '
+                  'reference_pressure: {}, '
+                  'reference_pressure_units: {}>'.format(
+                      self.reference_pressure, self.reference_pressure_units))
+        return result
+
+    def process(self, potential_temperature, pressure):
+        """
+        Calculate the temperature from the input potential temperature and
+        pressure cubes.
+
+        Args:
+            potential_temperature (iris.cube.Cube):
+                A cube containing potential temperature data
+            pressure (iris.cube.Cube):
+                A cube containing pressure data
+        Returns:
+            temperature (iris.cube.Cube):
+                A cube containing the resulting temperature data.
+        """
+        # We know these two are in the same units
+        power = cc.R_DRY_AIR/cc.CP_DRY_AIR
+        # Ensure our pressure data is in the same units, so the resulting
+        # calculation gives a cube with a fractional unit
+        reference_pressure = self.reference_pressure_units.convert(
+            self.reference_pressure, pressure.units)
+        pressure.data = (pressure.data / reference_pressure)**power
+        pressure.units = Unit("1")
+        # Find the potential temperature.
+        original_units = potential_temperature.units
+        potential_temperature.convert_units("K")
+        temperature = potential_temperature * pressure
+        temperature.convert_units(original_units)
+        temperature.rename("air_temperature")
+        return temperature

@@ -99,17 +99,16 @@ class Test_process(IrisTest):
         self.assertArrayAlmostEqual(result.data, expected_data)
         self.assertEqual(result.units, Unit('K'))
 
-    # This test is currently broken, emailed AVD to ask why.
-    # def test_different_temperature_units(self):
-        # """Check we still get the same result if the input is in
-        #    different units"""
-        # self.temperature.convert_units("celsius")
-        # print(self.temperature)
-        # result = TemperatureToPotentialTemperature().process(
-        #      self.temperature, self.pressure)
-        # expected_data = np.array([10., 10.028742, 9.731491])
-        # self.assertArrayAlmostEqual(result.data, expected_data)
-        # self.assertEqual(result.units, Unit('celsius'))
+    def test_different_temperature_units(self):
+        """Check we still get the same result if the input is in
+           different units"""
+        self.temperature.convert_units("celsius")
+        print(self.temperature)
+        result = TemperatureToPotentialTemperature().process(
+             self.temperature, self.pressure)
+        expected_data = np.array([10., 10.813835, 2.397178])
+        self.assertArrayAlmostEqual(result.data, expected_data)
+        self.assertEqual(result.units, Unit('celsius'))
 
 
 if __name__ == '__main__':
