@@ -43,14 +43,14 @@ from improver.psychrometric_calculations.psychrometric_calculations import (
 
 def main():
     """Load in the arguments and ensure they are set correctly. Then
-    convert temperature to potential temperature"""
+    convert potential temperature to temperature"""
     parser = ArgParser(
-        description='This CLI converts temperature to potential '
+        description='This CLI converts potential temperature to '
                     'temperature using an input pressure cube.')
     parser.add_argument('input_filenames', metavar='INPUT_FILENAMES',
                         nargs="+", type=str,
-                        help='Paths to input temperature and pressure netCDF '
-                        'files.')
+                        help='Paths to input potential temperature and '
+                        'pressure netCDF files.')
     parser.add_argument('output_file', metavar='OUTPUT_FILE',
                         help='The output file for the processed NetCDF.')
     args = parser.parse_args()
