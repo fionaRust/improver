@@ -1,4 +1,5 @@
-#!/usr/bin/env bats
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------
 # (C) British Crown Copyright 2017-2018 Met Office.
 # All rights reserved.
@@ -28,27 +29,38 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+"""Script to run the UV index plugin."""
 
-. $IMPROVER_DIR/tests/lib/utils
+from improver.argparser import ArgParser
+from improver.utilities.load import load_cube
+from improver.utilities.save import save_netcdf
+from improver.uv_index import calculate_uv_index
 
-@test "nowcast-optical-flow no orographic enhancement" {
-  improver_check_skip_acceptance
-  KGO1="nowcast-optical-flow/basic/ucomp_kgo.nc"
-  KGO2="nowcast-optical-flow/basic/vcomp_kgo.nc"
 
-  COMP1="201811031530_radar_rainrate_composite_UK_regridded.nc"
-  COMP2="201811031545_radar_rainrate_composite_UK_regridded.nc"
-  COMP3="201811031600_radar_rainrate_composite_UK_regridded.nc"
+def main():
+    """ Calculate the UV index using the data
+    in the input cubes."""
+    parser = ArgParser(
+        description="Calculates the UV index.")
+    parser.add_argument("radiation_flux_upward",
+                        metavar="RADIATION_FLUX_UPWARD",
+                        help="Path to a NetCDF file of radiation flux "
+                        "in uv upward at surface.")
+    parser.add_argument("radiation_flux_downward",
+                        metavar="RADIATION_FLUX_DOWNWARD",
+                        help="Path to a NetCDF file of radiation flux "
+                        "in uv downward at surface.")
+    parser.add_argument("output_filepath", metavar="OUTPUT_FILE",
+                        help="The output path for the processed NetCDF")
 
-  # Run processing and check it passes
-  run improver nowcast-optical-flow \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP1" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP2" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP3" \
-    --output_dir "$TEST_DIR"
-  [[ "$status" -eq 1 ]]
-  read -d '' expected <<'__TEXT__' || true
-ValueError: For precipitation fields, orographic enhancement
-__TEXT__
-  [[ "$output" =~ "$expected" ]]
-}
+    args = parser.parse_args()
+
+    rad_uv_up = load_cube(args.radiation_flux_upward)
+    rad_uv_down = load_cube(args.radiation_flux_downward)
+
+    result = calculate_uv_index(rad_uv_up, rad_uv_down)
+    save_netcdf(result, args.output_filepath)
+
+
+if __name__ == "__main__":
+    main()

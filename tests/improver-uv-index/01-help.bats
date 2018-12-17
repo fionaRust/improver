@@ -29,26 +29,31 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-. $IMPROVER_DIR/tests/lib/utils
+@test "uv-index -h" {
+  run improver uv-index -h
+  [[ "$status" -eq 0 ]]
+  read -d '' expected <<'__HELP__' || true
+usage: improver-uv-index [-h] [--profile] [--profile_file PROFILE_FILE]
+                         RADIATION_FLUX_UPWARD RADIATION_FLUX_DOWNWARD
+                         OUTPUT_FILE
 
-@test "nowcast-optical-flow no orographic enhancement" {
-  improver_check_skip_acceptance
-  KGO1="nowcast-optical-flow/basic/ucomp_kgo.nc"
-  KGO2="nowcast-optical-flow/basic/vcomp_kgo.nc"
+Calculates the UV index.
 
-  COMP1="201811031530_radar_rainrate_composite_UK_regridded.nc"
-  COMP2="201811031545_radar_rainrate_composite_UK_regridded.nc"
-  COMP3="201811031600_radar_rainrate_composite_UK_regridded.nc"
+positional arguments:
+  RADIATION_FLUX_UPWARD
+                        Path to a NetCDF file of radiation flux in uv upward
+                        at surface.
+  RADIATION_FLUX_DOWNWARD
+                        Path to a NetCDF file of radiation flux in uv downward
+                        at surface.
+  OUTPUT_FILE           The output path for the processed NetCDF
 
-  # Run processing and check it passes
-  run improver nowcast-optical-flow \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP1" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP2" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP3" \
-    --output_dir "$TEST_DIR"
-  [[ "$status" -eq 1 ]]
-  read -d '' expected <<'__TEXT__' || true
-ValueError: For precipitation fields, orographic enhancement
-__TEXT__
-  [[ "$output" =~ "$expected" ]]
+optional arguments:
+  -h, --help            show this help message and exit
+  --profile             Switch on profiling information.
+  --profile_file PROFILE_FILE
+                        Dump profiling info to a file. Implies --profile.
+
+__HELP__
+  [[ "$output" == "$expected" ]]
 }

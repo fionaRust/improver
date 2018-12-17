@@ -29,26 +29,34 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-. $IMPROVER_DIR/tests/lib/utils
-
-@test "nowcast-optical-flow no orographic enhancement" {
-  improver_check_skip_acceptance
-  KGO1="nowcast-optical-flow/basic/ucomp_kgo.nc"
-  KGO2="nowcast-optical-flow/basic/vcomp_kgo.nc"
-
-  COMP1="201811031530_radar_rainrate_composite_UK_regridded.nc"
-  COMP2="201811031545_radar_rainrate_composite_UK_regridded.nc"
-  COMP3="201811031600_radar_rainrate_composite_UK_regridded.nc"
-
-  # Run processing and check it passes
-  run improver nowcast-optical-flow \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP1" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP2" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP3" \
-    --output_dir "$TEST_DIR"
-  [[ "$status" -eq 1 ]]
+@test "extend-radar-mask -h" {
+  run improver extend-radar-mask -h
+  [[ "$status" -eq 0 ]]
   read -d '' expected <<'__TEXT__' || true
-ValueError: For precipitation fields, orographic enhancement
+usage: improver-extend-radar-mask [-h] [--profile]
+                                  [--profile_file PROFILE_FILE]
+                                  [--fix_float64]
+                                  RADAR_DATA_FILEPATH COVERAGE_FILEPATH
+                                  OUTPUT_FILEPATH
+
+Extend radar mask based on coverage data.
+
+positional arguments:
+  RADAR_DATA_FILEPATH   Full path to input NetCDF file containing the radar
+                        variable to remask.
+  COVERAGE_FILEPATH     Full path to input NetCDF file containing radar
+                        coverage data.
+  OUTPUT_FILEPATH       Full path to save remasked radar data NetCDF file.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --profile             Switch on profiling information.
+  --profile_file PROFILE_FILE
+                        Dump profiling info to a file. Implies --profile.
+  --fix_float64         Check and fix cube for float64 data. Without this
+                        option an exception will be raised if float64 data is
+                        found but no fix applied.
 __TEXT__
   [[ "$output" =~ "$expected" ]]
 }
+

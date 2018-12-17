@@ -31,24 +31,19 @@
 
 . $IMPROVER_DIR/tests/lib/utils
 
-@test "nowcast-optical-flow no orographic enhancement" {
+@test "percentile input output --percentiles 25 50 75 --ecc_bounds_warning" {
   improver_check_skip_acceptance
-  KGO1="nowcast-optical-flow/basic/ucomp_kgo.nc"
-  KGO2="nowcast-optical-flow/basic/vcomp_kgo.nc"
+  KGO="percentile/ecc_bounds_warning/kgo.nc"
 
-  COMP1="201811031530_radar_rainrate_composite_UK_regridded.nc"
-  COMP2="201811031545_radar_rainrate_composite_UK_regridded.nc"
-  COMP3="201811031600_radar_rainrate_composite_UK_regridded.nc"
+  # Run percentile processing and check it passes.
+  run improver percentile \
+      "$IMPROVER_ACC_TEST_DIR/percentile/ecc_bounds_warning/input.nc" "$TEST_DIR/output.nc" \
+      --coordinates realization --percentiles 25 50 75 --ecc_bounds_warning
+  [[ "$status" -eq 0 ]]
 
-  # Run processing and check it passes
-  run improver nowcast-optical-flow \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP1" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP2" \
-    "$IMPROVER_ACC_TEST_DIR/nowcast-optical-flow/basic/$COMP3" \
-    --output_dir "$TEST_DIR"
-  [[ "$status" -eq 1 ]]
-  read -d '' expected <<'__TEXT__' || true
-ValueError: For precipitation fields, orographic enhancement
-__TEXT__
-  [[ "$output" =~ "$expected" ]]
+  improver_check_recreate_kgo "output.nc" $KGO
+
+  # Run nccmp to compare the output and kgo.
+  improver_compare_output "$TEST_DIR/output.nc" \
+      "$IMPROVER_ACC_TEST_DIR/$KGO"
 }
