@@ -1169,6 +1169,12 @@ class TemperatureToPotentialTemperature(object):
         theta = temperature * pressure
         theta.convert_units(original_units)
         theta.rename("air_potential_temperature")
+        theta.attributes = temperature.attributes
+        try:
+            height_coord = temperature.coord("height")
+            theta.add_aux_coord(height_coord)
+        except iris.exceptions.CoordinateNotFoundError:
+            pass
         return theta
 
 
@@ -1239,4 +1245,10 @@ class PotentialTemperatureToTemperature(object):
         temperature = potential_temperature * pressure
         temperature.convert_units(original_units)
         temperature.rename("air_temperature")
+        temperature.attributes = potential_temperature.attributes
+        try:
+            height_coord = potential_temperature.coord("height")
+            temperature.add_aux_coord(height_coord)
+        except iris.exceptions.CoordinateNotFoundError:
+            pass
         return temperature

@@ -35,7 +35,7 @@ import iris
 import warnings
 
 from improver.argparser import ArgParser
-from improver.utilities.load import load_cubes
+from improver.utilities.load import load_cubelist
 from improver.utilities.save import save_netcdf
 from improver.psychrometric_calculations.psychrometric_calculations import (
     TemperatureToPotentialTemperature)
@@ -43,26 +43,23 @@ from improver.psychrometric_calculations.psychrometric_calculations import (
 
 def main():
     """Load in the arguments and ensure they are set correctly. Then
-    convert potential temperature to temperature"""
+    convert temperature to potential temperature"""
     parser = ArgParser(
-        description='This CLI converts potential temperature to '
+        description='This CLI converts temperature to potential '
                     'temperature using an input pressure cube.')
     parser.add_argument('input_filenames', metavar='INPUT_FILENAMES',
                         nargs="+", type=str,
-                        help='Paths to input potential temperature and '
-                        'pressure netCDF files.')
+                        help='Paths to input temperature and pressure netCDF '
+                        'files.')
     parser.add_argument('output_file', metavar='OUTPUT_FILE',
                         help='The output file for the processed NetCDF.')
     args = parser.parse_args()
 
-    # Load the cubes
-    cubes = iris.cube.CubeList([])
-    for filename in args.input_filenames:
-        new_cube = load_cubes(filename)
-        cubes.append(new_cube)
+    cubes = load_cubelist(args.input_filenames)
 
-    temperature = cubes.extract("air_temperature")
-    pressure = cubes.extract("air_pressure")
+    temperature = cubes.extract("air_temperature", strict=True)
+    pressure = cubes.extract("surface_air_pressure", strict=True)
+
     result = TemperatureToPotentialTemperature().process(temperature, pressure)
     save_netcdf(result, args.output_file)
 

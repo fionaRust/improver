@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env bats
 # -----------------------------------------------------------------------------
 # (C) British Crown Copyright 2017-2018 Met Office.
 # All rights reserved.
@@ -29,43 +28,30 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-"""Script to run time-lagged ensembles."""
 
-import iris
-import warnings
+@test "temperature-from-potential-temperature -h" {
+  run improver temperature-from-potential-temperature -h
+  [[ "$status" -eq 0 ]]
+  read -d '' expected <<'__HELP__' || true
+usage: improver-temperature-from-potential-temperature [-h] [--profile]
+                                                       [--profile_file PROFILE_FILE]
+                                                       INPUT_FILENAMES
+                                                       [INPUT_FILENAMES ...]
+                                                       OUTPUT_FILE
 
-from improver.argparser import ArgParser
-from improver.utilities.load import load_cubelist
-from improver.utilities.save import save_netcdf
-from improver.psychrometric_calculations.psychrometric_calculations import (
-    PotentialTemperatureToTemperature)
+This CLI converts potential temperature to temperature using an input pressure
+cube.
 
+positional arguments:
+  INPUT_FILENAMES       Paths to input potential temperature and pressure
+                        netCDF files.
+  OUTPUT_FILE           The output file for the processed NetCDF.
 
-def main():
-    """Load in the arguments and ensure they are set correctly. Then
-    convert potential temperature to temperature"""
-    parser = ArgParser(
-        description='This CLI converts potential temperature to '
-                    'temperature using an input pressure cube.')
-    parser.add_argument('input_filenames', metavar='INPUT_FILENAMES',
-                        nargs="+", type=str,
-                        help='Paths to input potential temperature and '
-                        'pressure netCDF files.')
-    parser.add_argument('output_file', metavar='OUTPUT_FILE',
-                        help='The output file for the processed NetCDF.')
-    args = parser.parse_args()
-
-    cubes = load_cubelist(args.input_filenames)
-
-    potential_temperature = cubes.extract(
-        "air_potential_temperature", strict=True)
-    pressure = cubes.extract("surface_air_pressure", strict=True)
-
-    result = PotentialTemperatureToTemperature().process(
-        potential_temperature, pressure)
-
-    save_netcdf(result, args.output_file)
-
-
-if __name__ == "__main__":
-    main()
+optional arguments:
+  -h, --help            show this help message and exit
+  --profile             Switch on profiling information.
+  --profile_file PROFILE_FILE
+                        Dump profiling info to a file. Implies --profile.
+__HELP__
+  [[ "$output" == "$expected" ]]
+}
