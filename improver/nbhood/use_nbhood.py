@@ -389,7 +389,11 @@ class CollapseMaskedNeighbourhoodCoordinate(BasePlugin):
         of the neighbourhood processing is taken into account to renormalize
         any weights corresponding to a NaN in the result from neighbourhooding.
         In this case the weights are re-normalized so that we do not lose
-        probability.
+        probability. The result from neighourhood procesing will have NaNs in
+        the same place for each slice over coord_masked, y and x. This is
+        because the position of the NaNs is detirmined by the band structure
+        and the neighbourhood size, which will be the same for all slices over
+        any leading dimensions.
 
         Args:
             cube (iris.cube.Cube):
@@ -408,12 +412,9 @@ class CollapseMaskedNeighbourhoodCoordinate(BasePlugin):
         yname = cube.coord(axis="y").name()
         xname = cube.coord(axis="x").name()
 
+        # Loop over any extra dimensions. Assume NaNs are in the same place
+        # in all slices so only renormalize weights using the first slice.
         renormalize = True
-        if self.weights.shape == cube.shape:
-            weights = self.renormalize_weights(cube)
-            renormalize = False
-
-        # Loop over any extra dimensions
         cubelist = iris.cube.CubeList([])
         for slice_3d in cube.slices([self.coord_masked, yname, xname]):
             if renormalize:
